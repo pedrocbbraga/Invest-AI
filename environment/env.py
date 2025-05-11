@@ -3,6 +3,8 @@ from gymnasium import spaces
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from scraper import get_fear_and_greed_index
+
 
 class Environment(gym.Env):
     def __init__(self):
@@ -25,6 +27,8 @@ class Environment(gym.Env):
         self.shares_held = 0
         self.prev_value = 0
 
+        self.fear_and_greed = 50
+
     # https://gymnasium.farama.org/api/env/#gymnasium.Env.reset
     # Resets the environment to an initial internal state, returning an initial observation and info
     def reset(self, seed=None, options=None):
@@ -33,6 +37,8 @@ class Environment(gym.Env):
         self.shares_held = 0
         self.prev_value = self.cash + self.shares_held * self.data.iloc[self.current_step]["Close"].iloc[0]
         
+        self.fear_and_greed = get_fear_and_greed_index()
+
         # return observation, info_dict
         return self.get_observation(), {}
 
@@ -79,7 +85,7 @@ class Environment(gym.Env):
     def get_observation(self):
         data_row = self.data.iloc[self.current_step]
         price = float(data_row["Close"].iloc[0])
-        fear_and_greed = 50
+        fear_and_greed = self.fear_and_greed
 
         # price, cash, shares held, F&G, 
         return np.array([price, self.cash, self.shares_held, fear_and_greed, self.current_step], dtype=np.float32)
@@ -93,6 +99,7 @@ class Environment(gym.Env):
         print("Initial state:", observation)
         print("TESTING DATA:")
         print(env.data.head())
+        print("Scraped Fear & Greed Index:", self.fear_and_greed)
 
         # CHECK IF THE VOO SHARE PRICE HELD HERE IS ACTUALLY VALID
         print("STEP 1:", env.step(0))
