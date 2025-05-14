@@ -1,0 +1,17 @@
+from stable_baselines3 import PPO
+from stable_baselines3.common.env_checker import check_env
+from env import Environment
+from stable_baselines3.common.monitor import Monitor
+
+env = Environment()
+env = Monitor(env)
+
+check_env(env, warn=True)
+
+model = PPO("MlpPolicy", env, verbose=1)
+
+model.learn(total_timesteps=100)
+
+model.save("ppo_invest_ai")
+
+print("Training complete and model saved.")
