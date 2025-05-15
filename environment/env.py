@@ -64,7 +64,7 @@ class Environment(gym.Env):
             print("HOLD")
             pass
 
-        print(self.fear_and_greed)
+        # print(self.fear_and_greed)
 
         # Increase timestep
         self.current_step += 1
@@ -77,7 +77,10 @@ class Environment(gym.Env):
         new_portfolio_value = self.cash + self.shares_held * price
 
         # Calculate reward
-        reward = new_portfolio_value - self.prev_value
+        if self.prev_value <= 0:
+            reward = np.log(new_portfolio_value)
+        else:
+            reward = np.log(new_portfolio_value / self.prev_value)
         self.prev_value = new_portfolio_value
 
         # Check if episode is over
@@ -100,19 +103,19 @@ class Environment(gym.Env):
     def render(self):
         pass
 
-    def test_data(self):
-        observation, _ = env.reset()
-        print("Initial state:", observation)
-        print("TESTING DATA:")
-        print(env.data.head())
-        print("Scraped Fear & Greed Index:", self.fear_and_greed)
+#     def test_data(self):
+#         observation, _ = env.reset()
+#         print("Initial state:", observation)
+#         print("TESTING DATA:")
+#         print(env.data.head())
+#         print("Scraped Fear & Greed Index:", self.fear_and_greed)
 
-        # CHECK IF THE VOO SHARE PRICE HELD HERE IS ACTUALLY VALID
-        print("STEP 1:", env.step(0))
-        print("STEP 2:", env.step(1))
-        print("STEP 3:", env.step(2))
-        print("STEP 4:", env.step(2))
-        print("STEP 5:", env.step(0))
+#         # CHECK IF THE VOO SHARE PRICE HELD HERE IS ACTUALLY VALID
+#         print("STEP 1:", env.step(0))
+#         print("STEP 2:", env.step(1))
+#         print("STEP 3:", env.step(2))
+#         print("STEP 4:", env.step(2))
+#         print("STEP 5:", env.step(0))
 
-env = Environment()
-env.test_data()
+# env = Environment()
+# env.test_data()
