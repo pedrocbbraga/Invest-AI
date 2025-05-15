@@ -47,7 +47,7 @@ class Environment(gym.Env):
     def step(self, action):
         # Get current ETF price
         data_row = self.data.iloc[self.current_step]
-        price = float(data_row["Close"].iloc[0])
+        price = float(data_row["Close"])
         
         # Apply action
         # FOR NOW, when buying/selling we either buy with all the cash or sell all shares (to simplify)
@@ -64,8 +64,14 @@ class Environment(gym.Env):
             print("HOLD")
             pass
 
+        print(self.fear_and_greed)
+
         # Increase timestep
         self.current_step += 1
+
+        # Monthly contribution aprox every 21 trading days = 1 month
+        # if self.current_step % 21 == 0:
+        #     self.cash += self.monthly_contribution
 
         # Get current portfolio value
         new_portfolio_value = self.cash + self.shares_held * price
@@ -84,7 +90,7 @@ class Environment(gym.Env):
     # Returns the current state of the environment as an np array
     def get_observation(self):
         data_row = self.data.iloc[self.current_step]
-        price = float(data_row["Close"].iloc[0])
+        price = float(data_row["Close"])
         fear_and_greed = self.fear_and_greed
 
         # price, cash, shares held, F&G, 
