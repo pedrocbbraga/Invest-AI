@@ -3,7 +3,8 @@ from gymnasium import spaces
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from scraper import get_fear_and_greed_index
+from scraper import load_historical_fgi
+
 
 
 class Environment(gym.Env):
@@ -22,7 +23,7 @@ class Environment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(5,))
 
 
-        self.data = yf.download("VOO", start="2010-01-01", end="2023-12-31")
+        self.data = yf.download("VOO", start="2011-01-03", end="2023-12-31")
         self.current_step = 0
         self.starting_cash = 10000
         self.monthly_contribution = 500
@@ -30,7 +31,8 @@ class Environment(gym.Env):
         self.shares_held = 0
         self.prev_value = 0.0
 
-        self.fear_and_greed = 50
+        self.fgi_data = load_historical_fgi("fear-greed-2011-2023.csv")
+
 
     # https://gymnasium.farama.org/api/env/#gymnasium.Env.reset
     # Resets the environment to an initial internal state, returning an initial observation and info
@@ -40,7 +42,6 @@ class Environment(gym.Env):
         self.shares_held = 0
         self.prev_value = self.cash + self.shares_held * self.data.iloc[self.current_step]["Close"].iloc[0]
         
-        self.fear_and_greed = get_fear_and_greed_index()
 
         # return observation, info_dict
         return self.get_observation(), {}
@@ -50,7 +51,7 @@ class Environment(gym.Env):
     def step(self, action):
         # Get current ETF price
         data_row = self.data.iloc[self.current_step]
-        price = float(data_row["Close"])
+        price = float(data_row["Close"].iloc[0]) if isinstance(data_row["Close"], pd.Series) else float(data_row["Close"])
 
         # Determines asset allocation as action (range between 0 and 1)
         target_allocation = float(np.clip(action[0], 0, 1))
@@ -132,11 +133,17 @@ class Environment(gym.Env):
 
     # Returns the current state of the environment as an np array
     def get_observation(self):
-        data_row = self.data.iloc[self.current_step]
-        price = float(data_row["Close"])
-        fear_and_greed = self.fear_and_greed
+        row = self.data.iloc[self.current_step]
+        price = float(row["Close"].iloc[0]) if isinstance(row["Close"], pd.Series) else float(row["Close"])
+        date = pd.to_datetime(row.name).normalize()  # row.name is the index (datetime)
 
-        # price, cash, shares held, F&G, 
+        fg_row = self.fgi_data[self.fgi_data["Date"] == date]
+        if not fg_row.empty:
+            fear_and_greed = float(fg_row["FearGreedIndex"].iloc[0])
+        else:
+            fear_and_greed = 50  # fallback
+
+        print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
         return np.array([price, self.cash, self.shares_held, fear_and_greed, self.current_step], dtype=np.float32)
 
     # Compute the render frames as specified by render_mode during the initialization of the environment
