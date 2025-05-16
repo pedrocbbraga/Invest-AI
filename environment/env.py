@@ -12,7 +12,10 @@ class Environment(gym.Env):
         
         # Three possible actions (0,1,2)
         # Buy = 0, Sell = 1, Hold = 2
-        self.action_space = spaces.Discrete(3)
+        # self.action_space = spaces.Discrete(3)
+
+        # Continous actions
+        self.action_space = spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
 
         # 5D vector stored as np array, holding what is observable in each state:
         # ETF price, cash held, shares held, F&G index value, timestep
@@ -25,7 +28,7 @@ class Environment(gym.Env):
         self.monthly_contribution = 500
         self.cash = self.starting_cash
         self.shares_held = 0
-        self.prev_value = 0
+        self.prev_value = 0.0
 
         self.fear_and_greed = 50
 
@@ -48,39 +51,76 @@ class Environment(gym.Env):
         # Get current ETF price
         data_row = self.data.iloc[self.current_step]
         price = float(data_row["Close"])
-        
-        # Apply action
-        # FOR NOW, when buying/selling we either buy with all the cash or sell all shares (to simplify)
-        if action == 0: # BUY
+
+        # Determines asset allocation as action (range between 0 and 1)
+        target_allocation = float(np.clip(action[0], 0, 1))
+        target_value_in_voo = self.prev_value * target_allocation
+        current_value_in_voo = self.shares_held * price
+        delta = target_value_in_voo - current_value_in_voo
+        shares_to_trade = int(delta // price)
+
+        # Transaction cost = 0.05%, as per the article "Leveraging LLM-based sentiment
+        # analysis for portfolio optimization with proximal policy optimization"
+        trade_value = abs(shares_to_trade * price)
+        transaction_cost = 0.0005 * trade_value
+
+        # Continous portfolio management/allocation
+        if shares_to_trade > 0:
             print("BUY")
-            shares_to_buy = self.cash // price
-            self.shares_held += shares_to_buy
-            self.cash -= shares_to_buy * price
-        elif action == 1: # SELL
+            cost = shares_to_trade * price + transaction_cost
+            if cost <= self.cash:
+                self.shares_held += shares_to_trade
+                self.cash -= cost
+        elif shares_to_trade < 0:
             print("SELL")
-            self.cash += self.shares_held * price
-            self.shares_held = 0
-        elif action == 2: # HOLD
+            shares_to_sell = abs(shares_to_trade)
+            if shares_to_sell <= self.shares_held:
+                self.shares_held -= shares_to_sell
+                self.cash += shares_to_sell * price - transaction_cost
+        elif shares_to_trade == 0:
             print("HOLD")
             pass
 
+        # Apply action
+        # FOR NOW, when buying/selling we either buy with all the cash or sell all shares (to simplify)
+        # if action == 0: # BUY
+        #     print("BUY")
+        #     shares_to_buy = self.cash // price
+        #     self.shares_held += shares_to_buy
+        #     self.cash -= shares_to_buy * price
+
+        #     trade_value = shares_to_buy * price
+        #     transaction_cost = 0.0005 * trade_value
+        #     self.cash -= transaction_cost
+        # elif action == 1: # SELL
+        #     print("SELL")
+        #     self.cash += self.shares_held * price
+
+        #     trade_value = self.shares_held * price
+        #     transaction_cost = 0.0005 * trade_value
+        #     self.cash -= transaction_cost
+            
+        #     self.shares_held = 0
+        # elif action == 2: # HOLD
+        #     print("HOLD")
+        #     pass
+
         # print(self.fear_and_greed)
+
+
 
         # Increase timestep
         self.current_step += 1
 
         # Monthly contribution aprox every 21 trading days = 1 month
-        # if self.current_step % 21 == 0:
-        #     self.cash += self.monthly_contribution
+        if self.current_step % 21 == 0:
+            self.cash += self.monthly_contribution
 
         # Get current portfolio value
         new_portfolio_value = self.cash + self.shares_held * price
 
-        # Calculate reward
-        if self.prev_value <= 0:
-            reward = np.log(new_portfolio_value)
-        else:
-            reward = np.log(new_portfolio_value / self.prev_value)
+        # Calculate reward, also as per the above-mentioned article
+        reward = np.log(new_portfolio_value / self.prev_value)
         self.prev_value = new_portfolio_value
 
         # Check if episode is over

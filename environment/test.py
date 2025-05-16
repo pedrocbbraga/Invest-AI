@@ -12,10 +12,18 @@ def test_model(model_path="ppo_invest_ai.zip", steps=3000):
 
     print("Starting evaluation...\\n")
 
+    # Buy and hold strategy for comparison purposes (does not include transaction costs f that)
     buy_and_hold_cash = env.starting_cash
     buy_and_hold_data = env.data
     buy_and_hold_shares = buy_and_hold_cash // buy_and_hold_data.iloc[0]["Close"]
     buy_and_hold_cash -= buy_and_hold_shares * buy_and_hold_data.iloc[0]["Close"]
+    for i in range(1, steps):
+        if i % 21 == 0:
+            buy_and_hold_cash += env.monthly_contribution
+            price = float(buy_and_hold_data.iloc[i]["Close"])
+            shares_bought = buy_and_hold_cash // price
+            buy_and_hold_cash -= shares_bought * price
+            buy_and_hold_shares += shares_bought
 
     while not done and step < steps:
         action, _states = model.predict(obs)
