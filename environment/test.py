@@ -14,7 +14,7 @@ def test_model(model_path="ppo_invest_ai.zip", steps=3000):
 
     # Buy and hold strategy for comparison purposes (does not include transaction costs f that)
     buy_and_hold_cash = env.starting_cash
-    buy_and_hold_data = env.data
+    buy_and_hold_data = env.data_voo
     buy_and_hold_shares = buy_and_hold_cash // buy_and_hold_data.iloc[0]["Close"]
     buy_and_hold_cash -= buy_and_hold_shares * buy_and_hold_data.iloc[0]["Close"]
     for i in range(1, steps):
@@ -32,12 +32,18 @@ def test_model(model_path="ppo_invest_ai.zip", steps=3000):
         step += 1
 
     final_price = float(buy_and_hold_data.iloc[min(step, len(buy_and_hold_data)-1)]["Close"])
+
+    final_price_voo = float(env.data_voo.iloc[min(step, len(buy_and_hold_data)-1)]["Close"])
+    final_price_2 = float(env.data_2.iloc[min(step, len(buy_and_hold_data)-1)]["Close"])
+    final_price_3 = float(env.data_3.iloc[min(step, len(buy_and_hold_data)-1)]["Close"])
+
     buy_and_hold_value = float(buy_and_hold_cash + buy_and_hold_shares * final_price)
+    agent_portfolio_value = (env.cash + env.shares_held_voo * final_price_voo + env.shares_held_2 * final_price_2 + env.shares_held_3 * final_price_3)
 
     print(f"\\nEvaluation complete.")
     print(f"Total steps taken: {step}")
     print(f"Total reward earned: {total_reward:.2f}")
-    print(f"Agent final portfolio value: {env.cash + env.shares_held * final_price:.2f}")
+    print(f"Agent final portfolio value: {agent_portfolio_value:.2f}")
     print(f"Buy and Hold final value: {buy_and_hold_value:.2f}")
 
 test_model()

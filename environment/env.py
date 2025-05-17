@@ -16,19 +16,25 @@ class Environment(gym.Env):
         # self.action_space = spaces.Discrete(3)
 
         # Continous actions
-        self.action_space = spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32)
+        self.action_space = spaces.Box(low=0, high=1, shape=(3,), dtype=np.float32)
 
         # 5D vector stored as np array, holding what is observable in each state:
         # ETF price, cash held, shares held, F&G index value, timestep
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(5,))
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,))
 
 
-        self.data = yf.download("VOO", start="2011-01-03", end="2023-12-31")
+        self.data_voo = yf.download("GOOG", start="2011-01-03", end="2023-12-31")
+        self.data_2 = yf.download("VUG", start="2011-01-03", end="2023-12-31")
+        self.data_3 = yf.download("AAPL", start="2011-01-03", end="2023-12-31")
         self.current_step = 0
         self.starting_cash = 10000
         self.monthly_contribution = 500
         self.cash = self.starting_cash
-        self.shares_held = 0
+
+        self.shares_held_voo = 0
+        self.shares_held_2 = 0
+        self.shares_held_3 = 0
+
         self.prev_value = 0.0
 
         self.fgi_data = load_historical_fgi("fear-greed-2011-2023.csv")
@@ -39,8 +45,11 @@ class Environment(gym.Env):
     def reset(self, seed=None, options=None):
         self.current_step = 0
         self.cash = self.starting_cash
-        self.shares_held = 0
-        self.prev_value = self.cash + self.shares_held * self.data.iloc[self.current_step]["Close"].iloc[0]
+        self.shares_held_voo = 0
+        self.shares_held_2 = 0
+        self.shares_held_3 = 0
+        self.prev_value = self.cash + self.shares_held_voo * self.data_voo.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_2 * self.data_2.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_3 * self.data_3.iloc[self.current_step]["Close"].iloc[0]
+        
         
 
         # return observation, info_dict
@@ -49,66 +58,63 @@ class Environment(gym.Env):
     # https://gymnasium.farama.org/api/env/#gymnasium.Env.step
     # Run one timestep of the environment’s dynamics using the agent actions
     def step(self, action):
-        # Get current ETF price
-        data_row = self.data.iloc[self.current_step]
-        price = float(data_row["Close"].iloc[0]) if isinstance(data_row["Close"], pd.Series) else float(data_row["Close"])
+        # Get current asset prices
+        row_voo = self.data_voo.iloc[self.current_step]
+        price_voo = float(row_voo["Close"].iloc[0]) if isinstance(row_voo["Close"], pd.Series) else float(row_voo["Close"])
+        
+        row_2 = self.data_2.iloc[self.current_step]
+        price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
+
+        row_3 = self.data_3.iloc[self.current_step]
+        price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
 
         # Determines asset allocation as action (range between 0 and 1)
-        target_allocation = float(np.clip(action[0], 0, 1))
-        target_value_in_voo = self.prev_value * target_allocation
-        current_value_in_voo = self.shares_held * price
-        delta = target_value_in_voo - current_value_in_voo
-        shares_to_trade = int(delta // price)
+        target_allocation = np.clip(action, 0, 1) # this clips the jawns to prevent out of bounds
 
-        # Transaction cost = 0.05%, as per the article "Leveraging LLM-based sentiment
-        # analysis for portfolio optimization with proximal policy optimization"
-        trade_value = abs(shares_to_trade * price)
-        transaction_cost = 0.0005 * trade_value
+
+        # 3 asset management
+        target_value_in_voo = self.prev_value * target_allocation[0]
+        current_value_in_voo = self.shares_held_voo * price_voo
+        delta_voo = target_value_in_voo - current_value_in_voo
+        shares_to_trade_voo = int(delta_voo // price_voo)
+
+        target_value_in_2 = self.prev_value * target_allocation[1]
+        current_value_in_2 = self.shares_held_2 * price_2
+        delta_2 = target_value_in_2 - current_value_in_2
+        shares_to_trade_2 = int(delta_2 // price_2)
+
+        target_value_in_3 = self.prev_value * target_allocation[2]
+        current_value_in_3 = self.shares_held_3 * price_3
+        delta_3 = target_value_in_3 - current_value_in_3
+        shares_to_trade_3 = int(delta_3 // price_3)
 
         # Continous portfolio management/allocation
-        if shares_to_trade > 0:
-            print("BUY")
-            cost = shares_to_trade * price + transaction_cost
-            if cost <= self.cash:
-                self.shares_held += shares_to_trade
-                self.cash -= cost
-        elif shares_to_trade < 0:
-            print("SELL")
-            shares_to_sell = abs(shares_to_trade)
-            if shares_to_sell <= self.shares_held:
-                self.shares_held -= shares_to_sell
-                self.cash += shares_to_sell * price - transaction_cost
-        elif shares_to_trade == 0:
-            print("HOLD")
-            pass
-
-        # Apply action
-        # FOR NOW, when buying/selling we either buy with all the cash or sell all shares (to simplify)
-        # if action == 0: # BUY
-        #     print("BUY")
-        #     shares_to_buy = self.cash // price
-        #     self.shares_held += shares_to_buy
-        #     self.cash -= shares_to_buy * price
-
-        #     trade_value = shares_to_buy * price
-        #     transaction_cost = 0.0005 * trade_value
-        #     self.cash -= transaction_cost
-        # elif action == 1: # SELL
-        #     print("SELL")
-        #     self.cash += self.shares_held * price
-
-        #     trade_value = self.shares_held * price
-        #     transaction_cost = 0.0005 * trade_value
-        #     self.cash -= transaction_cost
+        for shares_to_trade, price, shares_held_each_asset in [
+            (shares_to_trade_voo, price_voo, "shares_held_voo"),
+            (shares_to_trade_2, price_2, "shares_held_2"),
+            (shares_to_trade_3, price_3, "shares_held_3"),
+        ]:
             
-        #     self.shares_held = 0
-        # elif action == 2: # HOLD
-        #     print("HOLD")
-        #     pass
+            # Transaction cost = 0.05%, as per the article "Leveraging LLM-based sentiment
+            # analysis for portfolio optimization with proximal policy optimization"
+            trade_value = abs(shares_to_trade * price)
+            transaction_cost = 0.0005 * trade_value
 
-        # print(self.fear_and_greed)
-
-
+            if shares_to_trade > 0:
+                print("BUY")
+                cost = shares_to_trade * price + transaction_cost
+                if cost <= self.cash:
+                    setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) + shares_to_trade)
+                    self.cash -= cost
+            elif shares_to_trade < 0:
+                print("SELL")
+                shares_to_sell = abs(shares_to_trade)
+                if shares_to_sell <= getattr(self, shares_held_each_asset):
+                    setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) - shares_to_sell)
+                    self.cash += shares_to_sell * price - transaction_cost
+            elif shares_to_trade == 0:
+                print("HOLD")
+                pass
 
         # Increase timestep
         self.current_step += 1
@@ -118,7 +124,7 @@ class Environment(gym.Env):
             self.cash += self.monthly_contribution
 
         # Get current portfolio value
-        new_portfolio_value = self.cash + self.shares_held * price
+        new_portfolio_value = self.cash + self.shares_held_voo * price_voo + self.shares_held_2 * price_2 + self.shares_held_3 * price_3
 
         # Calculate reward, also as per the above-mentioned article
         reward = np.log(new_portfolio_value / self.prev_value)
@@ -126,16 +132,23 @@ class Environment(gym.Env):
 
         # Check if episode is over
         # print("Current step:", self.current_step)
-        # print("Len data:", len(self.data))
-        terminated = self.current_step >= len(self.data) - 1
+        # print("Len data:", len(self.data_voo))
+        terminated = self.current_step >= len(self.data_voo) - 1
 
         return self.get_observation(), reward, terminated, False, {}
 
     # Returns the current state of the environment as an np array
     def get_observation(self):
-        row = self.data.iloc[self.current_step]
-        price = float(row["Close"].iloc[0]) if isinstance(row["Close"], pd.Series) else float(row["Close"])
-        date = pd.to_datetime(row.name).normalize()  # row.name is the index (datetime)
+        row_voo = self.data_voo.iloc[self.current_step]
+        price_voo = float(row_voo["Close"].iloc[0]) if isinstance(row_voo["Close"], pd.Series) else float(row_voo["Close"])
+        
+        row_2 = self.data_2.iloc[self.current_step]
+        price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
+
+        row_3 = self.data_3.iloc[self.current_step]
+        price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
+        
+        date = pd.to_datetime(row_voo.name).normalize()  # row.name is the index (datetime)
 
         fg_row = self.fgi_data[self.fgi_data["Date"] == date]
         if not fg_row.empty:
@@ -143,8 +156,8 @@ class Environment(gym.Env):
         else:
             fear_and_greed = 50  # fallback
 
-        print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
-        return np.array([price, self.cash, self.shares_held, fear_and_greed, self.current_step], dtype=np.float32)
+        # print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
+        return np.array([self.cash, price_voo, self.shares_held_voo, price_2, self.shares_held_2, price_3, self.shares_held_3, fear_and_greed, self.current_step], dtype=np.float32)
 
     # Compute the render frames as specified by render_mode during the initialization of the environment
     def render(self):
