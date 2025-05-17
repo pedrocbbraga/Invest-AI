@@ -23,7 +23,8 @@ class Environment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,))
 
 
-        self.data_voo = yf.download("GOOG", start="2011-01-03", end="2023-12-31")
+        self.data_voo = yf.download("VOO", start="2011-01-03", end="2023-12-31")
+        self.data_1 = yf.download("GOOG", start="2011-01-03", end="2023-12-31")
         self.data_2 = yf.download("VUG", start="2011-01-03", end="2023-12-31")
         self.data_3 = yf.download("AAPL", start="2011-01-03", end="2023-12-31")
         self.current_step = 0
@@ -31,7 +32,7 @@ class Environment(gym.Env):
         self.monthly_contribution = 500
         self.cash = self.starting_cash
 
-        self.shares_held_voo = 0
+        self.shares_held_1 = 0
         self.shares_held_2 = 0
         self.shares_held_3 = 0
 
@@ -45,10 +46,10 @@ class Environment(gym.Env):
     def reset(self, seed=None, options=None):
         self.current_step = 0
         self.cash = self.starting_cash
-        self.shares_held_voo = 0
+        self.shares_held_1 = 0
         self.shares_held_2 = 0
         self.shares_held_3 = 0
-        self.prev_value = self.cash + self.shares_held_voo * self.data_voo.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_2 * self.data_2.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_3 * self.data_3.iloc[self.current_step]["Close"].iloc[0]
+        self.prev_value = self.cash + self.shares_held_1 * self.data_1.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_2 * self.data_2.iloc[self.current_step]["Close"].iloc[0] + self.shares_held_3 * self.data_3.iloc[self.current_step]["Close"].iloc[0]
         
         
 
@@ -59,8 +60,8 @@ class Environment(gym.Env):
     # Run one timestep of the environment’s dynamics using the agent actions
     def step(self, action):
         # Get current asset prices
-        row_voo = self.data_voo.iloc[self.current_step]
-        price_voo = float(row_voo["Close"].iloc[0]) if isinstance(row_voo["Close"], pd.Series) else float(row_voo["Close"])
+        row_1 = self.data_1.iloc[self.current_step]
+        price_1 = float(row_1["Close"].iloc[0]) if isinstance(row_1["Close"], pd.Series) else float(row_1["Close"])
         
         row_2 = self.data_2.iloc[self.current_step]
         price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
@@ -73,10 +74,10 @@ class Environment(gym.Env):
 
 
         # 3 asset management
-        target_value_in_voo = self.prev_value * target_allocation[0]
-        current_value_in_voo = self.shares_held_voo * price_voo
-        delta_voo = target_value_in_voo - current_value_in_voo
-        shares_to_trade_voo = int(delta_voo // price_voo)
+        target_value_in_1 = self.prev_value * target_allocation[0]
+        current_value_in_1 = self.shares_held_1 * price_1
+        delta_1 = target_value_in_1 - current_value_in_1
+        shares_to_trade_1 = int(delta_1 // price_1)
 
         target_value_in_2 = self.prev_value * target_allocation[1]
         current_value_in_2 = self.shares_held_2 * price_2
@@ -90,7 +91,7 @@ class Environment(gym.Env):
 
         # Continous portfolio management/allocation
         for shares_to_trade, price, shares_held_each_asset in [
-            (shares_to_trade_voo, price_voo, "shares_held_voo"),
+            (shares_to_trade_1, price_1, "shares_held_1"),
             (shares_to_trade_2, price_2, "shares_held_2"),
             (shares_to_trade_3, price_3, "shares_held_3"),
         ]:
@@ -124,7 +125,7 @@ class Environment(gym.Env):
             self.cash += self.monthly_contribution
 
         # Get current portfolio value
-        new_portfolio_value = self.cash + self.shares_held_voo * price_voo + self.shares_held_2 * price_2 + self.shares_held_3 * price_3
+        new_portfolio_value = self.cash + self.shares_held_1 * price_1 + self.shares_held_2 * price_2 + self.shares_held_3 * price_3
 
         # Calculate reward, also as per the above-mentioned article
         reward = np.log(new_portfolio_value / self.prev_value)
@@ -132,15 +133,15 @@ class Environment(gym.Env):
 
         # Check if episode is over
         # print("Current step:", self.current_step)
-        # print("Len data:", len(self.data_voo))
-        terminated = self.current_step >= len(self.data_voo) - 1
+        # print("Len data:", len(self.data_1))
+        terminated = self.current_step >= len(self.data_1) - 1
 
         return self.get_observation(), reward, terminated, False, {}
 
     # Returns the current state of the environment as an np array
     def get_observation(self):
-        row_voo = self.data_voo.iloc[self.current_step]
-        price_voo = float(row_voo["Close"].iloc[0]) if isinstance(row_voo["Close"], pd.Series) else float(row_voo["Close"])
+        row_1 = self.data_1.iloc[self.current_step]
+        price_1 = float(row_1["Close"].iloc[0]) if isinstance(row_1["Close"], pd.Series) else float(row_1["Close"])
         
         row_2 = self.data_2.iloc[self.current_step]
         price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
@@ -148,7 +149,7 @@ class Environment(gym.Env):
         row_3 = self.data_3.iloc[self.current_step]
         price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
         
-        date = pd.to_datetime(row_voo.name).normalize()  # row.name is the index (datetime)
+        date = pd.to_datetime(row_1.name).normalize()  # row.name is the index (datetime)
 
         fg_row = self.fgi_data[self.fgi_data["Date"] == date]
         if not fg_row.empty:
@@ -157,7 +158,7 @@ class Environment(gym.Env):
             fear_and_greed = 50  # fallback
 
         # print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
-        return np.array([self.cash, price_voo, self.shares_held_voo, price_2, self.shares_held_2, price_3, self.shares_held_3, fear_and_greed, self.current_step], dtype=np.float32)
+        return np.array([self.cash, price_1, self.shares_held_1, price_2, self.shares_held_2, price_3, self.shares_held_3, fear_and_greed, self.current_step], dtype=np.float32)
 
     # Compute the render frames as specified by render_mode during the initialization of the environment
     def render(self):
@@ -170,7 +171,7 @@ class Environment(gym.Env):
 #         print(env.data.head())
 #         print("Scraped Fear & Greed Index:", self.fear_and_greed)
 
-#         # CHECK IF THE VOO SHARE PRICE HELD HERE IS ACTUALLY VALID
+#         # CHECK IF THE 1 SHARE PRICE HELD HERE IS ACTUALLY VALID
 #         print("STEP 1:", env.step(0))
 #         print("STEP 2:", env.step(1))
 #         print("STEP 3:", env.step(2))
