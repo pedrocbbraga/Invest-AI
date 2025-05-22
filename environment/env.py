@@ -23,10 +23,14 @@ class Environment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(9,))
 
 
+        # self.data_voo = yf.download("VOO", start="2014-01-03", end="2024-12-31")
+        # self.data_1 = yf.download("GOOG", start="2014-01-03", end="2024-12-31")
+        # self.data_2 = yf.download("VUG", start="2014-01-03", end="2024-12-31")
+        # self.data_3 = yf.download("AAPL", start="2014-01-03", end="2024-12-31")
         self.data_voo = yf.download("VOO", start="2011-01-03", end="2023-12-31")
-        self.data_1 = yf.download("GOOG", start="2011-01-03", end="2023-12-31")
-        self.data_2 = yf.download("VUG", start="2011-01-03", end="2023-12-31")
-        self.data_3 = yf.download("AAPL", start="2011-01-03", end="2023-12-31")
+        self.data_1 = yf.download("VUG", start="2011-01-03", end="2023-12-31")
+        self.data_2 = yf.download("VT", start="2011-01-03", end="2023-12-31")
+        self.data_3 = yf.download("QQQ", start="2011-01-03", end="2023-12-31")
         self.current_step = 0
         self.starting_cash = 10000
         self.monthly_contribution = 500
@@ -69,9 +73,15 @@ class Environment(gym.Env):
         row_3 = self.data_3.iloc[self.current_step]
         price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
 
-        # Determines asset allocation as action (range between 0 and 1)
+        # determines asset allocation as per action (range between 0 and 1)
         target_allocation = np.clip(action, 0, 1) # this clips the jawns to prevent out of bounds
+        # print(target_allocation)
 
+        # normalize
+        if sum(target_allocation) > 1:
+            normalize_value = np.sum(target_allocation)
+            for i in range(len(target_allocation)):
+                target_allocation[i] /= normalize_value
 
         # 3 asset management
         target_value_in_1 = self.prev_value * target_allocation[0]
@@ -102,19 +112,19 @@ class Environment(gym.Env):
             transaction_cost = 0.0005 * trade_value
 
             if shares_to_trade > 0:
-                print("BUY")
+                # print("BUY")
                 cost = shares_to_trade * price + transaction_cost
                 if cost <= self.cash:
                     setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) + shares_to_trade)
                     self.cash -= cost
             elif shares_to_trade < 0:
-                print("SELL")
+                # print("SELL")
                 shares_to_sell = abs(shares_to_trade)
                 if shares_to_sell <= getattr(self, shares_held_each_asset):
                     setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) - shares_to_sell)
                     self.cash += shares_to_sell * price - transaction_cost
             elif shares_to_trade == 0:
-                print("HOLD")
+                # print("HOLD")
                 pass
 
         # Increase timestep

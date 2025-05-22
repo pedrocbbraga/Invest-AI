@@ -8,7 +8,7 @@ check_env(env, warn=True)
 
 model = PPO("MlpPolicy", env, verbose=1)
 
-model.learn(total_timesteps=1000000)
+model.learn(total_timesteps=2000000)
 
 model.save("ppo_invest_ai")
 
