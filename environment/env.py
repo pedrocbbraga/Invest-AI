@@ -62,6 +62,7 @@ class Environment(gym.Env):
 
     # https://gymnasium.farama.org/api/env/#gymnasium.Env.step
     # Run one timestep of the environment’s dynamics using the agent actions
+    '''
     def step(self, action):
         # Get current asset prices
         row_1 = self.data_1.iloc[self.current_step]
@@ -147,7 +148,110 @@ class Environment(gym.Env):
         terminated = self.current_step >= len(self.data_1) - 1
 
         return self.get_observation(), reward, terminated, False, {}
+    '''
+    def step(self, action):
+        # First apply action based on current prices
+        row_1 = self.data_1.iloc[self.current_step]
+        price_1 = float(row_1["Close"]) if not isinstance(row_1["Close"], pd.Series) else float(row_1["Close"].iloc[0])
 
+        row_2 = self.data_2.iloc[self.current_step]
+        price_2 = float(row_2["Close"]) if not isinstance(row_2["Close"], pd.Series) else float(row_2["Close"].iloc[0])
+
+        row_3 = self.data_3.iloc[self.current_step]
+        price_3 = float(row_3["Close"]) if not isinstance(row_3["Close"], pd.Series) else float(row_3["Close"].iloc[0])
+
+        target_allocation = np.clip(action, 0, 1)
+        if np.sum(target_allocation) > 1:
+            target_allocation /= np.sum(target_allocation)
+
+        current_portfolio_value = (
+            self.cash +
+            self.shares_held_1 * price_1 +
+            self.shares_held_2 * price_2 +
+            self.shares_held_3 * price_3
+        )
+
+        for i, (price, shares_attr) in enumerate([
+            (price_1, "shares_held_1"),
+            (price_2, "shares_held_2"),
+            (price_3, "shares_held_3")
+        ]):
+            target_value = current_portfolio_value * target_allocation[i]
+            current_value = getattr(self, shares_attr) * price
+            delta = target_value - current_value
+            shares_to_trade = int(delta // price)
+
+            trade_value = abs(shares_to_trade * price)
+            transaction_cost = 0.0005 * trade_value
+
+            if shares_to_trade > 0:
+                cost = shares_to_trade * price + transaction_cost
+                if cost <= self.cash:
+                    setattr(self, shares_attr, getattr(self, shares_attr) + shares_to_trade)
+                    self.cash -= cost
+            elif shares_to_trade < 0:
+                shares_to_sell = abs(shares_to_trade)
+                if shares_to_sell <= getattr(self, shares_attr):
+                    setattr(self, shares_attr, getattr(self, shares_attr) - shares_to_sell)
+                    self.cash += shares_to_sell * price - transaction_cost
+
+        self.current_step += 1
+        if self.current_step % 21 == 0:
+            self.cash += self.monthly_contribution
+
+        if self.current_step < len(self.data_1):
+            next_row_1 = self.data_1.iloc[self.current_step]
+            next_price_1 = float(next_row_1["Close"]) if not isinstance(next_row_1["Close"], pd.Series) else float(next_row_1["Close"].iloc[0])
+
+            next_row_2 = self.data_2.iloc[self.current_step]
+            next_price_2 = float(next_row_2["Close"]) if not isinstance(next_row_2["Close"], pd.Series) else float(next_row_2["Close"].iloc[0])
+
+            next_row_3 = self.data_3.iloc[self.current_step]
+            next_price_3 = float(next_row_3["Close"]) if not isinstance(next_row_3["Close"], pd.Series) else float(next_row_3["Close"].iloc[0])
+
+            new_value = (
+                self.cash +
+                self.shares_held_1 * next_price_1 +
+                self.shares_held_2 * next_price_2 +
+                self.shares_held_3 * next_price_3
+            )
+            reward = np.log(new_value / current_portfolio_value)
+        else:
+            reward = 0.0
+
+        done = self.current_step >= len(self.data_1) - 1
+
+        return self.get_observation(), reward, done, False, {}
+
+
+    def get_observation(self):
+        # Use prices from the previous step, NOT the current step
+        prev_step = max(self.current_step - 1, 0)
+
+        row_1 = self.data_1.iloc[prev_step]
+        price_1 = float(row_1["Close"]) if not isinstance(row_1["Close"], pd.Series) else float(row_1["Close"].iloc[0])
+
+        row_2 = self.data_2.iloc[prev_step]
+        price_2 = float(row_2["Close"]) if not isinstance(row_2["Close"], pd.Series) else float(row_2["Close"].iloc[0])
+
+        row_3 = self.data_3.iloc[prev_step]
+        price_3 = float(row_3["Close"]) if not isinstance(row_3["Close"], pd.Series) else float(row_3["Close"].iloc[0])
+
+        date = pd.to_datetime(row_1.name).normalize()
+
+        fg_row = self.fgi_data[self.fgi_data["Date"] == date]
+        fear_and_greed = float(fg_row["FearGreedIndex"].iloc[0]) if not fg_row.empty else 50
+
+        return np.array([
+            self.cash,
+            price_1, self.shares_held_1,
+            price_2, self.shares_held_2,
+            price_3, self.shares_held_3,
+            fear_and_greed,
+            self.current_step
+        ], dtype=np.float32)
+
+    '''
     # Returns the current state of the environment as an np array
     def get_observation(self):
         row_1 = self.data_1.iloc[self.current_step]
@@ -169,7 +273,7 @@ class Environment(gym.Env):
 
         # print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
         return np.array([self.cash, price_1, self.shares_held_1, price_2, self.shares_held_2, price_3, self.shares_held_3, fear_and_greed, self.current_step], dtype=np.float32)
-
+    '''
     # Compute the render frames as specified by render_mode during the initialization of the environment
     def render(self):
         pass
