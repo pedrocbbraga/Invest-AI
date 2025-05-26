@@ -1,7 +1,7 @@
 from stable_baselines3 import PPO
 from env import Environment
 
-def test_model(model_path="ppo_invest_ai.zip", steps=2500):
+def test_model(model_path="ppo_invest_ai.zip", steps=3000):
     env = Environment()
     model = PPO.load(model_path)
 
