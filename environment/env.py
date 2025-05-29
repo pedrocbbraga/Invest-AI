@@ -185,11 +185,13 @@ class Environment(gym.Env):
             transaction_cost = 0.0005 * trade_value
 
             if shares_to_trade > 0:
+                # print("BUY")
                 cost = shares_to_trade * price + transaction_cost
                 if cost <= self.cash:
                     setattr(self, shares_attr, getattr(self, shares_attr) + shares_to_trade)
                     self.cash -= cost
             elif shares_to_trade < 0:
+                # print("SELL")
                 shares_to_sell = abs(shares_to_trade)
                 if shares_to_sell <= getattr(self, shares_attr):
                     setattr(self, shares_attr, getattr(self, shares_attr) - shares_to_sell)

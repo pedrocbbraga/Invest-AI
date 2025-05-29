@@ -8,10 +8,10 @@ check_env(env, warn=True)
 
 model = PPO("MlpPolicy",
             env,
-            learning_rate=0.0003,
+            learning_rate=0.001,
             n_steps=2500,
-            n_epochs=10,
-            gamma=0.99,
+            n_epochs=15,
+            gamma=0.01,
             clip_range=0.1,
             ent_coef=0.01,
             vf_coef=0.5,
