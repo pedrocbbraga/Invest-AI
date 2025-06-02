@@ -62,93 +62,6 @@ class Environment(gym.Env):
 
     # https://gymnasium.farama.org/api/env/#gymnasium.Env.step
     # Run one timestep of the environment’s dynamics using the agent actions
-    '''
-    def step(self, action):
-        # Get current asset prices
-        row_1 = self.data_1.iloc[self.current_step]
-        price_1 = float(row_1["Close"].iloc[0]) if isinstance(row_1["Close"], pd.Series) else float(row_1["Close"])
-        
-        row_2 = self.data_2.iloc[self.current_step]
-        price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
-
-        row_3 = self.data_3.iloc[self.current_step]
-        price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
-
-        # determines asset allocation as per action (range between 0 and 1)
-        target_allocation = np.clip(action, 0, 1) # this clips the jawns to prevent out of bounds
-        # print(target_allocation)
-
-        # normalize
-        if sum(target_allocation) > 1:
-            normalize_value = np.sum(target_allocation)
-            for i in range(len(target_allocation)):
-                target_allocation[i] /= normalize_value
-
-        # 3 asset management
-        target_value_in_1 = self.prev_value * target_allocation[0]
-        current_value_in_1 = self.shares_held_1 * price_1
-        delta_1 = target_value_in_1 - current_value_in_1
-        shares_to_trade_1 = int(delta_1 // price_1)
-
-        target_value_in_2 = self.prev_value * target_allocation[1]
-        current_value_in_2 = self.shares_held_2 * price_2
-        delta_2 = target_value_in_2 - current_value_in_2
-        shares_to_trade_2 = int(delta_2 // price_2)
-
-        target_value_in_3 = self.prev_value * target_allocation[2]
-        current_value_in_3 = self.shares_held_3 * price_3
-        delta_3 = target_value_in_3 - current_value_in_3
-        shares_to_trade_3 = int(delta_3 // price_3)
-
-        # Continous portfolio management/allocation
-        for shares_to_trade, price, shares_held_each_asset in [
-            (shares_to_trade_1, price_1, "shares_held_1"),
-            (shares_to_trade_2, price_2, "shares_held_2"),
-            (shares_to_trade_3, price_3, "shares_held_3"),
-        ]:
-            
-            # Transaction cost = 0.05%, as per the article "Leveraging LLM-based sentiment
-            # analysis for portfolio optimization with proximal policy optimization"
-            trade_value = abs(shares_to_trade * price)
-            transaction_cost = 0.0005 * trade_value
-
-            if shares_to_trade > 0:
-                # print("BUY")
-                cost = shares_to_trade * price + transaction_cost
-                if cost <= self.cash:
-                    setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) + shares_to_trade)
-                    self.cash -= cost
-            elif shares_to_trade < 0:
-                # print("SELL")
-                shares_to_sell = abs(shares_to_trade)
-                if shares_to_sell <= getattr(self, shares_held_each_asset):
-                    setattr(self, shares_held_each_asset, getattr(self, shares_held_each_asset) - shares_to_sell)
-                    self.cash += shares_to_sell * price - transaction_cost
-            elif shares_to_trade == 0:
-                # print("HOLD")
-                pass
-
-        # Increase timestep
-        self.current_step += 1
-
-        # Monthly contribution aprox every 21 trading days = 1 month
-        if self.current_step % 21 == 0:
-            self.cash += self.monthly_contribution
-
-        # Get current portfolio value
-        new_portfolio_value = self.cash + self.shares_held_1 * price_1 + self.shares_held_2 * price_2 + self.shares_held_3 * price_3
-
-        # Calculate reward, also as per the above-mentioned article
-        reward = np.log(new_portfolio_value / self.prev_value)
-        self.prev_value = new_portfolio_value
-
-        # Check if episode is over
-        # print("Current step:", self.current_step)
-        # print("Len data:", len(self.data_1))
-        terminated = self.current_step >= len(self.data_1) - 1
-
-        return self.get_observation(), reward, terminated, False, {}
-    '''
     def step(self, action):
         # First apply action based on current prices
         row_1 = self.data_1.iloc[self.current_step]
@@ -253,29 +166,6 @@ class Environment(gym.Env):
             self.current_step
         ], dtype=np.float32)
 
-    '''
-    # Returns the current state of the environment as an np array
-    def get_observation(self):
-        row_1 = self.data_1.iloc[self.current_step]
-        price_1 = float(row_1["Close"].iloc[0]) if isinstance(row_1["Close"], pd.Series) else float(row_1["Close"])
-        
-        row_2 = self.data_2.iloc[self.current_step]
-        price_2 = float(row_2["Close"].iloc[0]) if isinstance(row_2["Close"], pd.Series) else float(row_2["Close"])
-
-        row_3 = self.data_3.iloc[self.current_step]
-        price_3 = float(row_3["Close"].iloc[0]) if isinstance(row_3["Close"], pd.Series) else float(row_3["Close"])
-        
-        date = pd.to_datetime(row_1.name).normalize()  # row.name is the index (datetime)
-
-        fg_row = self.fgi_data[self.fgi_data["Date"] == date]
-        if not fg_row.empty:
-            fear_and_greed = float(fg_row["FearGreedIndex"].iloc[0])
-        else:
-            fear_and_greed = 50  # fallback
-
-        # print(f"[STEP {self.current_step}] Date: {date.date()}, Price: {price:.2f}, F&G: {fear_and_greed}")
-        return np.array([self.cash, price_1, self.shares_held_1, price_2, self.shares_held_2, price_3, self.shares_held_3, fear_and_greed, self.current_step], dtype=np.float32)
-    '''
     # Compute the render frames as specified by render_mode during the initialization of the environment
     def render(self):
         pass
