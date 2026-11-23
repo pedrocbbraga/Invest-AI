@@ -9,3 +9,7 @@ Icon?
 *.swp
 *~
 
+__pycache__/
+*.pyc
+*.zip
+ppo_invest_ai/
