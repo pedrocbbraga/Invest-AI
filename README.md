@@ -3,7 +3,7 @@
 A PPO agent that allocates a three-ETF portfolio using the CNN Fear & Greed Index as a
 sentiment input.
 
-Across nine hyperparameter configurations it rarely beat buy-and-hold on the S&P 500.
+It rarely beat buy-and-hold on the S&P 500 across nine hyperparameter configurations 
 
 CS 486 research project at Drexel, with Shiv Chavda and Kushagra Mittal.
 
@@ -99,4 +99,4 @@ models.
 **Kushagra Mittal** built much of the training codebase and the PPO implementation, and found
 and fixed a logic flaw that had been producing unrealistically good results.
 
-Full write-up with all nine result sets: `InvestAI_Report_ResearchPaper.pdf`.
+Full write-up with all nine result sets: [InvestAI_Report_ResearchPaper.pdf](InvestAI_Report_ResearchPaper.pdf).
